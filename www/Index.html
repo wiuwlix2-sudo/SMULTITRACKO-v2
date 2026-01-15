@@ -207,6 +207,7 @@
 </div>
 native-bridge.bundle.js</script>
 <script>
+<script>
 (function(){
   const pin=document.getElementById('scalePin'); const stageWrap=document.getElementById('stageWrap');
   function res(){ const baseW=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--stageW')); const vw=window.innerWidth; let sc=vw/baseW; if(sc>1) sc=1; pin.style.transform=`scale(${sc})`; stageWrap.style.height=(pin.getBoundingClientRect().height)+'px'; requestAnimationFrame(()=>{ try{ drawWaveStatic(); buildBeatGrid(); }catch(e){} }); }
@@ -614,34 +615,48 @@ async function _writeBlobToDir(dirHandle, blob, filename){
   }catch(e){ console.warn(e); return false; }
 }
 async function saveBlobAs(blob, suggestedName){
+
   // ✅ APK (Capacitor): guardar y abrir menú nativo "Compartir/Guardar en..."
   if (window.NativeBridge && typeof window.NativeBridge.saveBlobAndShare === "function") {
     try {
-      await window.NativeBridge.saveBlobAndShare(blob, suggested);
-      return; // evita el guardado web normal
+      await window.NativeBridge.saveBlobAndShare(blob, suggestedName);
+      return true; // ya guardó/compartió, no sigue con guardado web
     } catch (e) {
       console.warn(e);
     }
-  // 1) carpeta seleccionada
+  }
+// 1) carpeta seleccionada
   if(exportDirHandle){
     const ok = await _writeBlobToDir(exportDirHandle, blob, suggestedName);
     if(ok) return true;
   }
+
   // 2) Save File Picker (si existe)
   if(window.showSaveFilePicker){
     try{
-      const h=await window.showSaveFilePicker({ suggestedName:suggestedName, types:[{description:'Proyecto MTP', accept:{'application/octet-stream':['.mtp']}}] });
+      const h=await window.showSaveFilePicker({
+        suggestedName:suggestedName,
+        types:[{description:'Proyecto MTP', accept:{'application/octet-stream':['.mtp']}}]
+      });
       const w=await h.createWritable();
-      await w.write(blob); await w.close();
+      await w.write(blob);
+      await w.close();
       return true;
     }catch(e){ console.warn(e); }
   }
+
   // 3) Descarga directa (fallback)
-  try{ _downloadBlob(blob, suggestedName); }catch(e){
+  try{
+    _downloadBlob(blob, suggestedName);
+  }catch(e){
     const a=document.createElement('a');
-    a.href=URL.createObjectURL(blob); a.download=suggestedName;
-    document.body.appendChild(a); a.click(); a.remove();
+    a.href=URL.createObjectURL(blob);
+    a.download=suggestedName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
+
   return true;
 }
 
