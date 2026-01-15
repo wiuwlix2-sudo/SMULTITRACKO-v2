@@ -614,6 +614,14 @@ async function _writeBlobToDir(dirHandle, blob, filename){
   }catch(e){ console.warn(e); return false; }
 }
 async function saveBlobAs(blob, suggestedName){
+  // ✅ APK (Capacitor): guardar y abrir menú nativo "Compartir/Guardar en..."
+  if (window.NativeBridge && typeof window.NativeBridge.saveBlobAndShare === "function") {
+    try {
+      await window.NativeBridge.saveBlobAndShare(blob, suggested);
+      return; // evita el guardado web normal
+    } catch (e) {
+      console.warn(e);
+    }
   // 1) carpeta seleccionada
   if(exportDirHandle){
     const ok = await _writeBlobToDir(exportDirHandle, blob, suggestedName);
@@ -638,6 +646,15 @@ async function saveBlobAs(blob, suggestedName){
 }
 
 async function pickMTPToImport(){
+   // ✅ APK (Capacitor): selector nativo para que .mtp sí aparezca
+  if (window.NativeBridge && typeof window.NativeBridge.pickAndImportMTP === "function") {
+    try {
+      await window.NativeBridge.pickAndImportMTP();
+      return; // no sigue con showOpenFilePicker ni input
+    } catch (e) {
+      console.warn(e);
+    }
+  }
   // showOpenFilePicker mejora el soporte de extensiones en algunos entornos
   if(window.showOpenFilePicker){
     try{
