@@ -232,7 +232,6 @@ function isImageFile(f){ const t=(f.type||'').toLowerCase(); if(t.startsWith('im
 function chooseCoverFromFiles(allFiles){
   const imgs = allFiles.filter(isImageFile);
   if(!imgs.length) return null;
-  // prefer names like cover/folder/artwork/front
   const preferred=['cover','folder','artwork','disc','album','front'];
   for(const key of preferred){
     const hit = imgs.find(f=> (f.name||'').toLowerCase().startsWith(key+'.') || (f.name||'').toLowerCase().includes(key));
@@ -293,13 +292,11 @@ async function createSessionFromFiles(fileList){
   const waveData=(window.__pendingWaveData? window.__pendingWaveData : await computePeaks(fileList[0])); window.__pendingWaveData=null;
   const session={id,title,tracks,bus,masterVol:0.85,playing:false,forceStartZeroNextPlay:true,bpm:parseInt(document.getElementById('bpm').value,10)||81,timesig:document.getElementById('timesig').value||'4/4',wave:waveData};
   sessions.push(session);
-  // asignar portada detectada (si existe)
   if(window.__pendingCoverFile){ setSessionArtwork(session, window.__pendingCoverFile); window.__pendingCoverFile=null; } else { setSessionArtwork(session, null); }
   renderCarousel();
   if(currentSessionId){ stopSession(currentSession()); }
   currentSessionId=session.id;
   document.getElementById('sessionLabel').textContent=session.title;
-  // siempre iniciar en 0
   seekAllToZero(session);
   session.forceStartZeroNextPlay=true;
   buildPlayerUI(session);
@@ -344,13 +341,11 @@ function renderCarousel(){
     card.appendChild(body);
 
     card.addEventListener('click',()=>{
-      // detener todo inmediato
       sessions.forEach(S=> stopSession(S));
       document.getElementById('playIcon').textContent='▶';
 
       currentSessionId=session.id;
       document.getElementById('sessionLabel').textContent=session.title;
-      // SIEMPRE iniciar desde 0 al seleccionar tarjeta
       seekAllToZero(session);
       session.forceStartZeroNextPlay=true;
       buildPlayerUI(session);
@@ -394,7 +389,6 @@ function deleteSession(id){
   }
 }
 
-/* ===== Fader (igual que v5) ===== */
 function createFader(initial,onChange,muted, cfg={}){
   const railTop = cfg.railTop ?? 12;
   const railH   = cfg.railH ?? 150;
@@ -426,7 +420,6 @@ function createFader(initial,onChange,muted, cfg={}){
 
 function volToGain(v){
   v = Math.max(0, Math.min(1, v));
-  // curva suave: más volumen percibido en el medio sin saturar (tope 1.0)
   return Math.min(1, Math.pow(v, 0.6));
 }
 
@@ -438,7 +431,6 @@ function applySolo(session){
   });
 }
 
-/* ===== Overlay show/hide ===== */
 const faderOverlay=document.getElementById('faderOverlay');
 const faderOverlayInner=document.getElementById('faderOverlayInner');
 let fadersOpen=false;
@@ -483,20 +475,15 @@ function buildPlayerUI(session){
   setFadersOverlay(fadersOpen);
 }
 
-/* ===== PLAY: respuesta inmediata (sin trabarse) ===== */
 const playBtn=document.getElementById('play');
 const playIcon=document.getElementById('playIcon');
 let playBusy=false;
 
 async function playStartImmediate(s, startAtZero=true){
   if(!s) return;
-  // asegurar contexto (debe ser rápido)
   await ensureCtx();
-  // parar otras
   sessions.forEach(S=>{ if(S.id!==s.id) stopSession(S); });
-  // iniciar en 0 solo cuando se pide
   if(startAtZero){ seekAllToZero(s); }
-  // intentar reproducir sin esperas largas
   try{
     const ps = s.tracks.map(t=>{
       try{ t.audioEl.muted=false; }catch(e){}
@@ -511,7 +498,6 @@ playBtn.addEventListener('click', ()=>{
   if(!s) return;
   if(playBusy) return;
   if(!s.playing){
-    // UI instantánea
     s.playing=true;
     playIcon.textContent='⏸';
     playBusy=true;
@@ -531,7 +517,6 @@ document.getElementById('rew').addEventListener('click', ()=>{
   refreshDur();
 });
 
-/* ===== Seek por waveform (sin cambios fuertes) ===== */
 const waveWrap=document.getElementById('waveWrap');
 const playheadEl=document.getElementById('playhead');
 let seeking=false; let wasPlaying=false; let lastNt=0; let lastSeekKick=0;
@@ -547,7 +532,6 @@ async function endSeek(){
   if(wasPlaying){
     s.playing=true;
     playIcon.textContent='⏸';
-    // reanudar inmediato desde donde quedó el palito (sin reset)
     try{ s.tracks.forEach(t=>{ try{ t.audioEl.muted=false; }catch(e){} t.audioEl.play().catch(()=>{}); }); }catch(e){}
   }
 }
@@ -557,7 +541,6 @@ window.addEventListener('pointerup', endSeek);
 window.addEventListener('pointercancel', endSeek);
 playheadEl.addEventListener('pointerdown',ev=>{ if(fadersOpen) return; beginSeek(getClientX(ev)); ev.stopPropagation(); ev.preventDefault(); });
 
-/* ===== Metronomo + Menú + Guardar/Import (igual que v5 salvo cur) ===== */
 const knobCanvas=document.getElementById('metroKnob'); const kctx=knobCanvas.getContext('2d');
 function drawKnob(val){ const w=knobCanvas.width,h=knobCanvas.height; kctx.clearRect(0,0,w,h); kctx.beginPath(); kctx.arc(w/2,h/2,30,0,Math.PI*2); kctx.fillStyle='#191b1d'; kctx.fill(); kctx.strokeStyle='#0e0f10'; kctx.lineWidth=2; kctx.stroke(); const start=-Math.PI*0.75, end=start+Math.max(val,0.05)*Math.PI*1.5; kctx.beginPath(); kctx.arc(w/2,h/2,26,start,end); kctx.strokeStyle='rgba(43,220,115,0.9)'; kctx.lineWidth=6; kctx.lineCap='round'; kctx.stroke(); const ang=end; const x=w/2+Math.cos(ang)*22; const y=h/2+Math.sin(ang)*22; kctx.beginPath(); kctx.arc(x,y,4,0,Math.PI*2); kctx.fillStyle='#cbd3d8'; kctx.fill(); }
 let draggingKnob=false; function setVolFromEvent(ev){ const r=knobCanvas.getBoundingClientRect(); const cx=r.left+r.width/2; const cy=r.top+r.height/2; const p=ev.touches? ev.touches[0] : ev; const dx=p.clientX-cx; const dy=p.clientY-cy; let ang=Math.atan2(dy,dx); let t=(ang+Math.PI*0.75)/(Math.PI*1.5); t=Math.max(0,Math.min(1,t)); metroVolValue=t; drawKnob(metroVolValue); if(metroGainNode) metroGainNode.gain.value=metroVolValue; }
@@ -590,13 +573,11 @@ function openSaveDialog(){
   const dlg=document.getElementById('saveDialog');
   const inp=document.getElementById('saveName');
 
-  // radios + chips
   const curRadio = dlg.querySelector('input[name="saveScope"][value="current"]');
   const allRadio = dlg.querySelector('input[name="saveScope"][value="all"]');
   const chipCur = dlg.querySelector('#chipCurrent');
   const chipAll = dlg.querySelector('#chipAll');
 
-  // default
   if(curRadio) curRadio.checked = true;
   if(allRadio) allRadio.checked = false;
 
@@ -607,7 +588,6 @@ function openSaveDialog(){
     inp.value = (isAll ? 'proyecto' : (s.title||'proyecto')).replace(/[^\w\-]+/g,'_');
   };
 
-  // click en chips para asegurar selección (compatibilidad)
   if(chipCur) chipCur.onclick=()=>{ if(curRadio) curRadio.checked=true; if(allRadio) allRadio.checked=false; sync(); };
   if(chipAll) chipAll.onclick=()=>{ if(allRadio) allRadio.checked=true; if(curRadio) curRadio.checked=false; sync(); };
   if(curRadio) curRadio.onchange=sync;
@@ -633,9 +613,6 @@ function openSaveDialog(){
   };
 }
 
-
-// ===== PROYECTO MTP (paquete propio) =====
-// Formato: [4 bytes 'MTP1'] [uint32 headerLen LE] [header JSON UTF-8] [data blobs...]
 async function saveProjectMTP(nameBase){
   const s=currentSession();
   if(!s){ alert('No hay sesión activa.'); return; }
@@ -649,7 +626,6 @@ async function saveProjectMTP(nameBase){
   const blobs=[];
   let off=0;
 
-  // En esta fase guardamos SOLO la sesión activa
   const sess={
     title:s.title,
     bpm:s.bpm,
@@ -680,7 +656,6 @@ async function saveProjectMTP(nameBase){
     off += ab.byteLength;
   }
 
-  // Guardar portada si existe
   if(s.artworkFile){
     const img=s.artworkFile;
     const ab=await img.arrayBuffer();
@@ -713,12 +688,10 @@ async function saveProjectMTP(nameBase){
   document.body.appendChild(a); a.click(); a.remove();
 }
 
-// ===== Guardar proyecto completo (todas las tarjetas) =====
 async function saveProjectMTP_All(nameBase){
   const list = (sessions||[]).filter(s=>s && s.tracks && Array.isArray(s.tracks));
   if(!list.length){ alert('No hay sesiones para guardar.'); return; }
 
-  // detener reproducción actual
   try{ const cs=currentSession(); if(cs && cs.playing){ cs.tracks.forEach(t=>{ try{ t.audioEl.pause(); t.audioEl.playbackRate=1.0; }catch(e){} }); cs.playing=false; playIcon.textContent='▶'; } }catch(e){}
 
   const enc=new TextEncoder();
@@ -809,8 +782,6 @@ async function importProjectMTP(file){
   let header; try{ header=JSON.parse(headerJson);}catch(e){ alert('Header MTP corrupto'); return; }
   if(header.type!=='mtp'){ alert('No es un proyecto MTP'); return; }
 
-  // modo adherir: NO borrar sesiones existentes
-  // detener sesiones en reproducción para evitar mezclas
   try{ sessions.forEach(S=>{ if(S.playing){ S.tracks.forEach(t=>{ try{ t.audioEl.pause(); t.audioEl.playbackRate=1.0; }catch(e){} }); S.playing=false; } }); }catch(e){}
 
   const dataStart=8+headerLen;
@@ -823,7 +794,6 @@ async function importProjectMTP(file){
       audioFiles.push(new File([slice], tr.fileName||tr.trackName||'pista', {type: tr.mime||'audio/*'}));
     }
 
-    // Portada desde el paquete
     let cover=null;
     if(sess.artwork){
       const start=dataStart+(sess.artwork.offset|0);
@@ -831,7 +801,6 @@ async function importProjectMTP(file){
       cover=new File([buf.slice(start,end)], sess.artwork.fileName||'cover', {type: sess.artwork.mime||'image/*'});
     }
 
-    // picos guardados
     if(sess.wave && sess.wave.peaks){
       try{ window.__pendingWaveData={ duration: sess.wave.duration||0, peaks: new Float32Array(sess.wave.peaks) }; }catch(e){ window.__pendingWaveData=null; }
     } else { window.__pendingWaveData=null; }
@@ -862,7 +831,6 @@ try{
   const strips = document.querySelectorAll('#faderOverlayInner .stripCompact');
   strips.forEach((strip, idx)=>{
     const tr = s.tracks[idx]; if(!tr) return;
-    // localizar botones por su texto 'M' y 'S'
     const btns = strip.querySelectorAll('.btnCircle');
     let mBtn=null, sBtn=null;
     btns.forEach(b=>{
@@ -872,7 +840,6 @@ try{
     });
     if(mBtn) mBtn.classList.toggle('active', !!tr.muted);
     if(sBtn) sBtn.classList.toggle('active', !!tr.solo);
-    // reflejar estado 'muted' en el fader visual
     const faderEl = strip.querySelector('.fader2');
     if(faderEl) faderEl.classList.toggle('muted', !!tr.muted);
   });
@@ -885,7 +852,6 @@ try{
     playIcon.textContent='▶';
   }
 
-  // Si ya había sesiones antes, volver a la sesión que estaba seleccionada
   if(hadSessions && prevCurrentId){
     currentSessionId = prevCurrentId;
     const s=currentSession();
@@ -914,7 +880,6 @@ async function importProjectFile(file){ const name=(file.name||'').toLowerCase()
   s.title=data.title??s.title; document.getElementById('sessionLabel').textContent=s.title;
   s.masterVol=data.master??0.85; s.bus.gain.value=s.masterVol;
   data.tracks.forEach((t,i)=>{ const tr=s.tracks[i]; if(!tr) return; tr.vol=t.vol??0.75; tr.pan.pan.value=t.pan??0; tr.muted=!!t.muted; tr.solo=!!t.solo; });
-  // SIEMPRE iniciar en 0
   seekAllToZero(s);
   buildPlayerUI(s);
   applySolo(s);
@@ -925,7 +890,6 @@ async function importProjectFile(file){ const name=(file.name||'').toLowerCase()
 
 function b64ToBlob(b64,mime){ const bin=atob(b64); const len=bin.length; const bytes=new Uint8Array(len); for(let i=0;i<len;i++) bytes[i]=bin.charCodeAt(i); return new Blob([bytes],{type:mime||'audio/*'}); }
 
-/* ===== Waveform ===== */
 const waveCanvas=document.getElementById('wave'); const waveCtx=waveCanvas.getContext('2d'); const beatGrid=document.getElementById('beatGrid'); const waveWrapEl=document.getElementById('waveWrap');
 if('ResizeObserver' in window){ const ro=new ResizeObserver(()=>{ requestAnimationFrame(()=>{ try{ drawWaveStatic(); buildBeatGrid(); }catch(e){} }); }); ro.observe(waveWrapEl); }
 function clearWave(){ const w=waveWrapEl.clientWidth, h=waveWrapEl.clientHeight; waveCanvas.width=w; waveCanvas.height=h; waveCtx.clearRect(0,0,w,h); }
@@ -949,6 +913,123 @@ function frame(){ const s=currentSession(); if(s){ const cur=Math.max(...s.track
 document.getElementById('bpm').addEventListener('change', buildBeatGrid);
 document.getElementById('timesig').addEventListener('change', buildBeatGrid);
 function currentSession(){ return sessions.find(s=>s.id===currentSessionId); }
+
+;(()=>{
+  async function buildMTPBlobFromSessions(list){
+    const enc=new TextEncoder();
+    const header={ type:'mtp', ver:1, createdAt:Date.now(), sessions:[] };
+    const blobs=[]; let off=0;
+    for(const s of list){
+      const sess={ title:s.title, bpm:s.bpm, timesig:s.timesig, master:(s.masterVol ?? (s.bus?.gain?.value ?? 0.85)), wave:(s.wave&&s.wave.peaks)?{ duration:s.wave.duration||0, peaks:Array.from(s.wave.peaks) }:null, tracks:[], artwork:null };
+      const abs = await Promise.all(s.tracks.map(t=> t.file.arrayBuffer()));
+      for(let i=0;i<s.tracks.length;i++){
+        const t=s.tracks[i]; const f=t.file; const ab=abs[i];
+        blobs.push(ab);
+        sess.tracks.push({ trackName:t.name, fileName:f.name, mime:f.type||'audio/*', offset:off, length:ab.byteLength, vol:t.vol, pan:t.pan.pan.value, muted:!!t.muted, solo:!!t.solo });
+        off += ab.byteLength;
+      }
+      if(s.artworkFile){
+        const img=s.artworkFile; const ab=await img.arrayBuffer();
+        blobs.push(ab);
+        sess.artwork={ fileName: img.name||'cover', mime: img.type||'image/*', offset:off, length:ab.byteLength };
+        off += ab.byteLength;
+      }
+      header.sessions.push(sess);
+    }
+    const headerBytes=enc.encode(JSON.stringify(header));
+    const magic=enc.encode('MTP1');
+    const lenBuf=new ArrayBuffer(4);
+    new DataView(lenBuf).setUint32(0, headerBytes.byteLength, true);
+    return new Blob([magic, lenBuf, headerBytes, ...blobs], {type:'application/octet-stream'});
+  }
+  function downloadBlob(blob, suggested){
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download=suggested;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>{ try{ URL.revokeObjectURL(a.href); }catch(e){} }, 1500);
+  }
+  const __origSaveOne = window.saveProjectMTP;
+  window.saveProjectMTP = async function(nameBase){
+    const s=currentSession(); if(!s){ alert('No hay sesión activa.'); return; }
+    if(s.playing){ try{ s.tracks.forEach(t=>{ try{ t.audioEl.pause(); t.audioEl.playbackRate=1.0; }catch(e){} }); }catch(e){} s.playing=false; playIcon.textContent='▶'; }
+    const blob = await buildMTPBlobFromSessions([s]);
+    const suggested=((nameBase||s.title||'proyecto').replace(/[^\w\-]+/g,'_'))+'.mtp';
+    downloadBlob(blob, suggested);
+  };
+  const __origSaveAll = window.saveProjectMTP_All;
+  window.saveProjectMTP_All = async function(nameBase){
+    const list=(sessions||[]).filter(s=>s && s.tracks && Array.isArray(s.tracks));
+    if(!list.length){ alert('No hay sesiones para guardar.'); return; }
+    const cs=currentSession(); if(cs && cs.playing){ try{ cs.tracks.forEach(t=>{ try{ t.audioEl.pause(); t.audioEl.playbackRate=1.0; }catch(e){} }); }catch(e){} cs.playing=false; playIcon.textContent='▶'; }
+    const blob = await buildMTPBlobFromSessions(list);
+    const suggested=((nameBase||'proyecto').replace(/[^\w\-]+/g,'_'))+'.mtp';
+    downloadBlob(blob, suggested);
+  };
+  if(window.showOpenFilePicker){
+    const menuImportEl=document.getElementById('menuImport');
+    if(menuImportEl){
+      menuImportEl.addEventListener('click', async (ev)=>{
+        ev.preventDefault(); ev.stopImmediatePropagation();
+        try{
+          const handles = await window.showOpenFilePicker({ multiple:true, types:[{ description:'Proyecto MTP', accept:{'application/octet-stream':['.mtp']} }] });
+          for(const h of handles){
+            const file = await h.getFile();
+            window.__pendingMTPHandle = h;
+            window.__pendingMTPFileName = file.name || 'proyecto.mtp';
+            await importProjectMTP(file);
+          }
+        }catch(e){
+          document.getElementById('menuLoadSession').click();
+        } finally {
+          const mp=document.getElementById('menuPanel'); if(mp) mp.style.display='none';
+        }
+      }, {capture:true});
+    }
+  }
+  const __origCreateFromFiles = window.createSessionFromFiles;
+  window.createSessionFromFiles = async function(fileList){
+    const before = sessions.length;
+    await __origCreateFromFiles(fileList);
+    const created = sessions.slice(before);
+    if(window.__pendingMTPHandle){
+      for(const s of created){ s.__fileHandle = window.__pendingMTPHandle; s.__fileName = window.__pendingMTPFileName || ((s.title||'proyecto') + '.mtp'); }
+      window.__pendingMTPHandle=null; window.__pendingMTPFileName=null;
+    }
+  };
+  function ensureMasterQuickSaveButton(){
+    const bar=document.querySelector('#masterDock .masterDockBtns');
+    if(!bar) return; if(bar.querySelector('#quickSaveBtn')) return;
+    const btn=document.createElement('div');
+    btn.className='btnSquare'; btn.id='quickSaveBtn'; btn.title='Guardar rápido (mismo archivo si es posible)'; btn.textContent='⤓';
+    btn.addEventListener('click', async (ev)=>{
+      ev.stopPropagation();
+      const s=currentSession(); if(!s){ alert('No hay sesión activa.'); return; }
+      if(s.playing){ try{ s.tracks.forEach(t=>{ try{ t.audioEl.pause(); t.audioEl.playbackRate=1.0; }catch(e){} }); }catch(e){} s.playing=false; playIcon.textContent='▶'; }
+      try{
+        if(s.__fileHandle && s.__fileHandle.createWritable){
+          const group = (sessions||[]).filter(x=> x.__fileHandle === s.__fileHandle);
+          const blob = await buildMTPBlobFromSessions(group.length? group : [s]);
+          const w = await s.__fileHandle.createWritable(); await w.write(blob); await w.close();
+          btn.classList.add('active'); setTimeout(()=>btn.classList.remove('active'), 600);
+        } else {
+          const blob = await buildMTPBlobFromSessions([s]);
+          const suggested=((s.__fileName || s.title || 'proyecto').replace(/[^\w\-]+/g,'_').replace(/\.mtp$/i,''))+'.mtp';
+          downloadBlob(blob, suggested);
+          btn.classList.add('active'); setTimeout(()=>btn.classList.remove('active'), 600);
+        }
+      }catch(e){
+        try{
+          const blob = await buildMTPBlobFromSessions([s]);
+          const suggested=((s.__fileName || s.title || 'proyecto').replace(/[^\w\-]+/g,'_').replace(/\.mtp$/i,''))+'.mtp';
+          downloadBlob(blob, suggested);
+        }catch(_){}
+      }
+    });
+    bar.appendChild(btn);
+  }
+  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', ensureMasterQuickSaveButton); }
+  else { ensureMasterQuickSaveButton(); }
+})();
 </script>
 </body>
 </html>
