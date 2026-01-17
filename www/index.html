@@ -932,25 +932,5 @@ document.getElementById('bpm').addEventListener('change', buildBeatGrid);
 document.getElementById('timesig').addEventListener('change', buildBeatGrid);
 function currentSession(){ return sessions.find(s=>s.id===currentSessionId); }
 </script>
-document.addEventListener('click', async function(ev){
-  var t = ev.target;
-  if(!t || t.id !== 'saveOk') return;
-  var dlg = document.getElementById('saveDialog');
-  var allRadio = dlg && dlg.querySelector('input[name="saveScope"][value="all"]');
-  var chipAll = document.getElementById('chipAll');
-  var isAll = (chipAll && chipAll.classList.contains('checked')) || (allRadio && allRadio.checked);
-  if(!isAll) return;
-  ev.stopImmediatePropagation();
-  ev.preventDefault();
-  var inp = document.getElementById('saveName');
-  var name = (inp && inp.value ? inp.value : 'proyecto').replace(/[^\w\-]+/g,'_');
-  t.disabled = true; t.style.opacity = '0.85';
-  try{
-    await saveProjectMTP_All(name);
-  } finally{
-    if(dlg) dlg.style.display = 'none';
-    t.disabled = false; t.style.opacity = '1';
-  }
-}, true);
 </body>
 </html>
